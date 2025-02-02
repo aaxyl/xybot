@@ -1,6 +1,4 @@
-import datetime
-
-import discord, requests, asyncio, aiohttp, random, time
+import discord, requests, asyncio, aiohttp, random, time, datetime
 from time import sleep
 from discord.ext import commands
 from typing import Dict, List
@@ -13,14 +11,16 @@ user_configs: Dict[str, Dict[str, str | float]] = {}  # For user-specific config
 intents = discord.Intents.default()  # Defining intents
 intents.message_content = True  # Adding the message_content intent so that the bot can read user messages
 
-# List of available models
+# List of available models - you will need to download
 models = [
+    # This section is manually hardcoded - for now, manually add the names of your downloaded models in Ollama here
+    
     'hf.co/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF:Q8_0',  # [0] DeepSeek R1 Distill Qwen 7B GGUF 8-bit
     'hf.co/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF:Q4_K_M'  # [1] DeepSeek R1 Distill Qwen 7B GGUF 4-bit
 ]
 
 # Used for testing/defaults
-api_url = 'http://localhost:42069/api/generate'
+api_url = 'http://localhost:11434/api/generate'
 default_model = models[1]
 default_temp = 0.7
 
@@ -59,23 +59,6 @@ async def on_ready():
     print("Bot is ready. Use this link to it to your guild: \n"
           "https://discord.com/oauth2/authorize?client_id="
           "1053809317314318378&permissions=18432&integration_type=0&scope=bot")
-
-
-@bot.command()
-async def config(ctx, model: str = None, temperature: float = None):
-    """
-    Configure the AI settings for your conversations.
-    Usage:
-    !config [model] [temperature]
-    """
-    user_id = str(ctx.author.id)
-    # Store user-specific configurations
-    user_configs[user_id] = {
-        "model": model or "deepseek-r1-d-qwen-gguf:8b",
-        "temperature": temperature or 0.7
-    }
-    await ctx.send(
-        f"Configured: Model={user_configs[user_id]['model']}, Temperature={user_configs[user_id]['temperature']}")
 
 
 async def random_wait_text(ctx, input_time):
@@ -220,18 +203,6 @@ async def on_message(message):
             await message.channel.send("You've exceeded the message limit. Please try again later.")
             return
 
-        # Add the user's message to the chat history
-        chat_history[user_id] = chat_history.get(user_id, [])
-        chat_history[user_id].append(f"User: {message.content}")
-
-        if len(chat_history[user_id]) > 5:
-            chat_history[user_id] = chat_history[user_id][-5:]
-
-        # Get user-specific configurations
-        # config = user_configs.get(
-        #     user_id, {"model": "hf.co/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF:Q8_0", "temperature": 0.7}
-        # )
-
         if current_model == "":
             current_model = default_model
         if current_temp == -1:
@@ -268,21 +239,6 @@ async def on_message(message):
         remind_task = asyncio.create_task(send_reminder(message))
 
         try:
-            # response = requests.post(
-            #     'http://localhost:42069/api/generate',
-            #     json={
-            #         "model": "hf.co/unsloth/DeepSeek-R1-Distill-Qwen-7B-GGUF:Q8_0",
-            #         "prompt": message.content[len('!ai '):],
-            #         "temperature": 0.7,
-            #         "stream": False
-            #     }
-            # )
-
-            # "model": config["model"],
-            # "prompt": f"Chat history:\n{chat_history[user_id]}\n\nUser: {message.content[len('!ai '):]}",
-            # "temperature": config["temperature"],
-            # "stream": False
-
             payload = {
                 "model": current_model,
                 "prompt": message.content[len('!ai '):],
@@ -307,17 +263,8 @@ async def on_message(message):
             await change_bot_status("available")
             remind_task.cancel()
 
-        # if response.status_code != 200:
-        #     await message.channel.send("Error: Invalid request or response from the AI server.")
-        #     bot.ai_request_in_progress = False
-        #     await bot.change_presence(
-        #         status=discord.Status.online
-        #     )
-        #     return
-
         try:
             print(f"Response: {response}")
-            # data = response.json()
             data = response
             ai_response = data["response"]
 
@@ -349,7 +296,6 @@ async def on_message(message):
 
         await lgmsg.delete()
 
-        # await send_large_message(message, ai_response)
         full_message = await process_large_message(message, ai_response)
 
         end_time = round_seconds(datetime.datetime.now())
